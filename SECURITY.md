@@ -8,7 +8,7 @@ Use GitHub private vulnerability reporting if enabled, or contact the maintainer
 
 ## Implemented controls
 - Password hashing with Werkzeug.
-- One-time first-administrator bootstrap, closed after an account exists.
+- One-time first-administrator bootstrap requiring a separate environment secret, closed after an account exists.
 - HMAC-signed expiring bearer tokens; secret supplied by environment configuration.
 - Role checks for event modification and administrator-only audit access.
 - SQL parameterization, input bounds, JSON validation, pagination and request-size limits.
