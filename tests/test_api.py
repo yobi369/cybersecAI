@@ -114,6 +114,70 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(blocked.status_code, 429)
         self.assertGreaterEqual(int(blocked.headers.get("Retry-After", "0")), 1)
 
+    def create_user(self, username, role="analyst"):
+        import database
+        from werkzeug.security import generate_password_hash
+        connection = database.connect_db()
+        cursor = connection.execute(
+            "INSERT INTO users(username,password_hash,role,created_at) VALUES(?,?,?,?)",
+            (username, generate_password_hash("other-user-strong-password-123"), role, "2026-01-01T00:00:00+00:00"),
+        )
+        user_id = cursor.lastrowid
+        connection.commit()
+        connection.close()
+        return user_id
+
+    def test_admin_can_list_accounts_and_change_role_revoking_sessions(self):
+        self.assertEqual(self.bootstrap().status_code, 201)
+        admin_headers = self.headers(self.login().json["access_token"])
+        user_id = self.create_user("triage_analyst")
+        listing = self.client.get("/api/v1/admin/users", headers=admin_headers)
+        self.assertEqual(listing.status_code, 200)
+        self.assertNotIn("password_hash", str(listing.json))
+        changed = self.client.patch(f"/api/v1/admin/users/{user_id}", headers=admin_headers,
+                                    json={"role": "viewer"})
+        self.assertEqual(changed.status_code, 200, changed.json)
+        self.assertTrue(changed.json["sessions_revoked"])
+        user_login = self.client.post("/api/v1/auth/login", json={
+            "username": "triage_analyst", "password": "other-user-strong-password-123"
+        })
+        self.assertEqual(user_login.status_code, 200)
+        old_token = user_login.json["access_token"]
+        disabled = self.client.patch(f"/api/v1/admin/users/{user_id}", headers=admin_headers,
+                                     json={"disabled": True})
+        self.assertEqual(disabled.status_code, 200, disabled.json)
+        self.assertEqual(self.client.get("/api/v1/auth/me", headers=self.headers(old_token)).status_code, 401)
+        self.assertEqual(self.client.post("/api/v1/auth/login", json={
+            "username": "triage_analyst", "password": "other-user-strong-password-123"
+        }).status_code, 401)
+
+    def test_admin_account_management_blocks_self_lockout_and_last_admin_removal(self):
+        self.assertEqual(self.bootstrap().status_code, 201)
+        admin_headers = self.headers(self.login().json["access_token"])
+        self_id = self.client.get("/api/v1/auth/me", headers=admin_headers).json["id"]
+        self.assertEqual(self.client.patch(f"/api/v1/admin/users/{self_id}", headers=admin_headers,
+                                           json={"disabled": True}).status_code, 409)
+        self.assertEqual(self.client.patch(f"/api/v1/admin/users/{self_id}", headers=admin_headers,
+                                           json={"role": "viewer"}).status_code, 409)
+        self.assertEqual(self.client.patch(f"/api/v1/admin/users/{self_id}", headers=admin_headers,
+                                           json={"role": "admin", "disabled": False, "unexpected": 1}).status_code, 400)
+        self.assertEqual(self.client.patch("/api/v1/admin/users/9999", headers=admin_headers,
+                                           json={"disabled": True}).status_code, 404)
+
+    def test_non_admin_cannot_manage_accounts(self):
+        self.assertEqual(self.bootstrap().status_code, 201)
+        admin_headers = self.headers(self.login().json["access_token"])
+        user_id = self.create_user("read_only", "viewer")
+        self.assertEqual(self.client.patch(f"/api/v1/admin/users/{user_id}", headers=admin_headers,
+                                           json={"role": "analyst"}).status_code, 200)
+        viewer_token = self.client.post("/api/v1/auth/login", json={
+            "username": "read_only", "password": "other-user-strong-password-123"
+        }).json["access_token"]
+        viewer_headers = self.headers(viewer_token)
+        self.assertEqual(self.client.get("/api/v1/admin/users", headers=viewer_headers).status_code, 403)
+        self.assertEqual(self.client.patch(f"/api/v1/admin/users/{user_id}", headers=viewer_headers,
+                                           json={"disabled": True}).status_code, 403)
+
     def test_short_bootstrap_password_rejected(self):
         response = self.client.post("/api/v1/auth/bootstrap", headers={"X-Bootstrap-Token":"test-bootstrap-token-that-is-over-32-bytes"}, json={"username":"admin","password":"short"})
         self.assertEqual(response.status_code, 400)
