@@ -107,8 +107,8 @@ def create_app(test_config=None):
             if not header.startswith("Bearer "): return jsonify(error="authentication_required"), 401
             claims = decode_token(header[7:].strip())
             if claims is None: return jsonify(error="invalid_or_expired_token"), 401
-            user = db().execute("SELECT id,username,role,token_version FROM users WHERE id=?", (claims["sub"],)).fetchone()
-            if user is None or user["username"] != claims["username"] or user["role"] != claims["role"] or user["token_version"] != claims["ver"]:
+            user = db().execute("SELECT id,username,role,token_version,disabled FROM users WHERE id=?", (claims["sub"],)).fetchone()
+            if user is None or user["disabled"] or user["username"] != claims["username"] or user["role"] != claims["role"] or user["token_version"] != claims["ver"]:
                 return jsonify(error="invalid_or_expired_token"), 401
             g.user = user
             return handler(*args, **kwargs)
@@ -189,8 +189,8 @@ def create_app(test_config=None):
             response.headers["Retry-After"] = str(retry_after)
             return response
 
-        user = db().execute("SELECT id,username,password_hash,role,token_version FROM users WHERE username=?", (username,)).fetchone()
-        if user is None or not check_password_hash(user["password_hash"], password):
+        user = db().execute("SELECT id,username,password_hash,role,token_version,disabled FROM users WHERE username=?", (username,)).fetchone()
+        if user is None or user["disabled"] or not check_password_hash(user["password_hash"], password):
             if not throttle or now - throttle["window_started"] >= 900:
                 failures, window_started = 1, now
             else:
@@ -233,6 +233,63 @@ def create_app(test_config=None):
         audit(db(), g.user["id"], "auth.password_changed", "user", str(g.user["id"]))
         db().commit()
         return jsonify(message="Password changed. Sign in again; existing sessions have been invalidated."), 200
+
+    @app.get("/api/v1/admin/users")
+    @roles("admin")
+    def admin_list_users():
+        rows = db().execute(
+            "SELECT id,username,role,disabled,created_at FROM users ORDER BY id ASC"
+        ).fetchall()
+        return jsonify(items=[{**dict(row), "disabled": bool(row["disabled"])} for row in rows])
+
+    @app.patch("/api/v1/admin/users/<int:user_id>")
+    @roles("admin")
+    def admin_update_user(user_id):
+        payload = payload_object()
+        if payload is None or not payload or not set(payload).issubset({"role", "disabled"}):
+            return jsonify(error="invalid_update"), 400
+        if "role" in payload and payload["role"] not in VALID_ROLES:
+            return jsonify(error="invalid_role"), 400
+        if "disabled" in payload and not isinstance(payload["disabled"], bool):
+            return jsonify(error="invalid_disabled_value"), 400
+
+        connection = db()
+        try:
+            connection.execute("BEGIN IMMEDIATE" if not DATABASE_URL else "BEGIN")
+            target = connection.execute(
+                "SELECT id,username,role,disabled,token_version FROM users WHERE id=?", (user_id,)
+            ).fetchone()
+            if target is None:
+                connection.rollback()
+                return jsonify(error="not_found"), 404
+            new_role = payload.get("role", target["role"])
+            new_disabled = int(payload.get("disabled", bool(target["disabled"])))
+            changes_privilege = new_role != target["role"] or new_disabled != int(target["disabled"])
+            if target["id"] == g.user["id"] and (new_role != "admin" or new_disabled):
+                connection.rollback()
+                return jsonify(error="cannot_lock_out_self"), 409
+            if target["role"] == "admin" and not target["disabled"] and (new_role != "admin" or new_disabled):
+                active_admins = connection.execute(
+                    "SELECT COUNT(*) AS total FROM users WHERE role='admin' AND disabled=0"
+                ).fetchone()["total"]
+                if active_admins <= 1:
+                    connection.rollback()
+                    return jsonify(error="last_active_admin_required"), 409
+            connection.execute(
+                "UPDATE users SET role=?,disabled=?,token_version=token_version+? WHERE id=?",
+                (new_role, new_disabled, 1 if changes_privilege else 0, user_id),
+            )
+            audit(connection, g.user["id"], "user.access_changed", "user", str(user_id), {
+                "username": target["username"], "role_from": target["role"], "role_to": new_role,
+                "disabled_from": bool(target["disabled"]), "disabled_to": bool(new_disabled),
+            })
+            connection.commit()
+            return jsonify(id=user_id, username=target["username"], role=new_role,
+                           disabled=bool(new_disabled),
+                           sessions_revoked=bool(changes_privilege)), 200
+        except Exception:
+            connection.rollback()
+            raise
 
     @app.get("/api/v1/events")
     @authenticated
