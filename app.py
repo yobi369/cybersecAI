@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from functools import wraps
 from pathlib import Path
 from typing import Any
-from flask import Flask, g, jsonify, request
+from flask import Flask, g, jsonify, request, render_template
 from werkzeug.security import check_password_hash, generate_password_hash
 
 DATABASE_PATH = Path(os.environ.get("CYBERSECAI_DATABASE", str(Path(__file__).parent / "data" / "cybersecai.db")))
@@ -128,6 +128,10 @@ def create_app(test_config=None):
         value = value.strip()
         if not value or len(value) > limit or any(ord(c) < 32 and c not in "\t\n\r" for c in value): return None
         return value
+
+    @app.get("/console")
+    def console():
+        return render_template("console.html")
 
     @app.get("/health")
     def health(): return jsonify(status="ok", service="cybersecai-api", timestamp=utc_now())
