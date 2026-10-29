@@ -66,3 +66,28 @@ jobs:
       - run: pip install -r requirements.txt bandit pip-audit
       - run: bandit -q -r app.py database.py -ll
       - run: pip-audit
+
+  container-smoke:
+    name: Container build and runtime smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build container image
+        run: docker build --tag cybersecai-ci .
+      - name: Start container and verify health
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name cybersecai-smoke \
+            --env CYBERSECAI_SECRET_KEY=ci-only-secret-key-that-is-long-enough-123456 \
+            --env CYBERSECAI_BOOTSTRAP_TOKEN=ci-only-bootstrap-token-that-is-long-enough-123456 \
+            --publish 127.0.0.1:8000:8000 cybersecai-ci
+          cleanup() { docker logs cybersecai-smoke || true; docker rm --force cybersecai-smoke >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          healthy=false
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/health; then healthy=true; break; fi
+            sleep 1
+          done
+          test "$healthy" = true
+          test "$(docker exec cybersecai-smoke id -u)" = "10001"
