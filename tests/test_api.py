@@ -28,12 +28,27 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Security operations console", response.data)
 
+    def test_console_uses_external_assets_for_strict_csp(self):
+        response = self.client.get("/console")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'href="/static/console.css"', response.data)
+        self.assertIn(b'src="/static/console.js" defer', response.data)
+        self.assertNotIn(b"<style>", response.data)
+        self.assertNotIn(b"<script>", response.data)
+        css = self.client.get("/static/console.css")
+        js = self.client.get("/static/console.js")
+        self.assertEqual(css.status_code, 200)
+        self.assertEqual(js.status_code, 200)
+        self.assertIn(b"addEventListener", js.data)
+
     def test_health(self):
         response = self.client.get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get("X-Content-Type-Options"), "nosniff")
         self.assertEqual(response.headers.get("X-Frame-Options"), "DENY")
         self.assertIn("frame-ancestors 'none'", response.headers.get("Content-Security-Policy", ""))
+        self.assertIn("object-src 'none'", response.headers.get("Content-Security-Policy", ""))
+        self.assertNotIn("unsafe-inline", response.headers.get("Content-Security-Policy", ""))
 
     def test_auth_responses_are_not_cacheable(self):
         response = self.client.post("/api/v1/auth/login", json={"username": "missing", "password": "wrong"})
