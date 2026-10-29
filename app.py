@@ -332,12 +332,16 @@ def create_app(test_config=None):
         severity, status = request.args.get("severity"), request.args.get("status")
         if severity is not None and severity not in VALID_SEVERITIES: return jsonify(error="invalid_severity"), 400
         if status is not None and status not in VALID_STATUSES: return jsonify(error="invalid_status"), 400
-        clauses, values = [], []
-        if severity: clauses.append("severity=?"); values.append(severity)
-        if status: clauses.append("status=?"); values.append(status)
-        where = " WHERE " + " AND ".join(clauses) if clauses else ""
-        rows = db().execute("SELECT id,title,description,source,severity,status,event_time,created_at,updated_at,created_by FROM events" + where + " ORDER BY id DESC LIMIT ? OFFSET ?", (*values, limit, offset)).fetchall()
-        total = db().execute("SELECT COUNT(*) total FROM events" + where, values).fetchone()["total"]
+        rows = db().execute(
+            "SELECT id,title,description,source,severity,status,event_time,created_at,updated_at,created_by "
+            "FROM events WHERE (? IS NULL OR severity=?) AND (? IS NULL OR status=?) "
+            "ORDER BY id DESC LIMIT ? OFFSET ?",
+            (severity, severity, status, status, limit, offset),
+        ).fetchall()
+        total = db().execute(
+            "SELECT COUNT(*) total FROM events WHERE (? IS NULL OR severity=?) AND (? IS NULL OR status=?)",
+            (severity, severity, status, status),
+        ).fetchone()["total"]
         return jsonify(items=[dict(row) for row in rows], total=total, limit=limit, offset=offset)
 
     @app.post("/api/v1/events")
