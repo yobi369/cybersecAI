@@ -54,6 +54,23 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         response = self.client.patch("/api/v1/events/1", headers=headers, json={"status":"resolved","severity":"low"})
         self.assertEqual(response.status_code, 400)
+    def test_log_analysis_returns_labeled_heuristics(self):
+        self.bootstrap()
+        headers = self.headers(self.login().json["access_token"])
+        response = self.client.post("/api/v1/analyze", headers=headers, json={
+            "logs": "authentication failure for test user\nnormal service started\n"
+        })
+        self.assertEqual(response.status_code, 200, response.json)
+        self.assertEqual(response.json["finding_count"], 1)
+        self.assertEqual(response.json["findings"][0]["rule_id"], "AUTH-001")
+        self.assertIn("not proof of compromise", response.json["disclaimer"])
+
+    def test_log_analysis_rejects_empty_and_oversized_input(self):
+        self.bootstrap()
+        headers = self.headers(self.login().json["access_token"])
+        self.assertEqual(self.client.post("/api/v1/analyze", headers=headers, json={"logs": ""}).status_code, 400)
+        self.assertEqual(self.client.post("/api/v1/analyze", headers=headers, json={"logs": "x" * 100001}).status_code, 413)
+
     def test_short_bootstrap_password_rejected(self):
         response = self.client.post("/api/v1/auth/bootstrap", json={"username":"admin","password":"short"})
         self.assertEqual(response.status_code, 400)
