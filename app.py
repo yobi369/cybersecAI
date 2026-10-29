@@ -17,6 +17,54 @@ VALID_ROLES = {"admin", "analyst", "viewer"}
 def utc_now():
     return datetime.now(timezone.utc).isoformat()
 
+
+def audit(db, actor_id, action, resource_type, resource_id=None, details=None):
+    db.execute(
+        "INSERT INTO audit_log(actor_id,action,resource_type,resource_id,details_json,created_at) VALUES(?,?,?,?,?,?)",
+        (actor_id, action, resource_type, resource_id,
+         json.dumps(details or {}, separators=(",", ":"), sort_keys=True), utc_now()),
+    )
+
+def token_secret():
+    secret = os.environ.get("CYBERSECAI_SECRET_KEY", "")
+    if len(secret) < 32:
+        raise RuntimeError("CYBERSECAI_SECRET_KEY must be set to at least 32 characters")
+    return secret.encode()
+
+def issue_token(user):
+    import base64
+    header = base64.urlsafe_b64encode(b'{"alg":"HS256","typ":"JWT"}').rstrip(b"=").decode()
+    payload = json.dumps({
+        "sub": user["id"], "username": user["username"], "role": user["role"],
+        "exp": int(time.time()) + TOKEN_TTL_SECONDS,
+    }, separators=(",", ":"), sort_keys=True).encode()
+    body = base64.urlsafe_b64encode(payload).rstrip(b"=").decode()
+    signing = f"{header}.{body}".encode()
+    signature = base64.urlsafe_b64encode(
+        hmac.new(token_secret(), signing, hashlib.sha256).digest()
+    ).rstrip(b"=").decode()
+    return f"{header}.{body}.{signature}"
+
+def decode_token(token):
+    import base64
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            return None
+        expected = base64.urlsafe_b64encode(
+            hmac.new(token_secret(), f"{parts[0]}.{parts[1]}".encode(), hashlib.sha256).digest()
+        ).rstrip(b"=").decode()
+        if not hmac.compare_digest(expected, parts[2]):
+            return None
+        claims = json.loads(base64.urlsafe_b64decode(parts[1] + "=" * (-len(parts[1]) % 4)))
+        if not isinstance(claims.get("exp"), int) or claims["exp"] <= int(time.time()):
+            return None
+        if not isinstance(claims.get("sub"), int) or claims.get("role") not in VALID_ROLES:
+            return None
+        return claims
+    except (ValueError, TypeError, KeyError, RuntimeError, json.JSONDecodeError):
+        return None
+
 def create_app(test_config=None):
     app = Flask(__name__)
     app.config.update(MAX_CONTENT_LENGTH=MAX_BODY_BYTES)
