@@ -334,7 +334,7 @@ def create_app(test_config=None):
         if status is not None and status not in VALID_STATUSES: return jsonify(error="invalid_status"), 400
         rows = db().execute(
             "SELECT id,title,description,source,severity,status,event_time,created_at,updated_at,created_by "
-            "FROM events WHERE (? IS NULL OR severity=?) AND (? IS NULL OR status=?) "
+            "FROM events WHERE (CAST(? AS TEXT) IS NULL OR severity=?) AND (CAST(? AS TEXT) IS NULL OR status=?) "
             "ORDER BY id DESC LIMIT ? OFFSET ?",
             (severity, severity, status, status, limit, offset),
         ).fetchall()
