@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: cybersecai-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --workers 2 --bind 0.0.0.0:$PORT --access-logfile - --error-logfile - app:app
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: CYBERSECAI_SECRET_KEY
+        generateValue: true
+      - key: TOKEN_TTL_SECONDS
+        value: "3600"
