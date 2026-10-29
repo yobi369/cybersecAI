@@ -35,7 +35,7 @@ def issue_token(user):
     import base64
     header = base64.urlsafe_b64encode(b'{"alg":"HS256","typ":"JWT"}').rstrip(b"=").decode()
     payload = json.dumps({
-        "sub": user["id"], "username": user["username"], "role": user["role"],
+        "sub": user["id"], "username": user["username"], "role": user["role"], "ver": user["token_version"],
         "exp": int(time.time()) + TOKEN_TTL_SECONDS,
     }, separators=(",", ":"), sort_keys=True).encode()
     body = base64.urlsafe_b64encode(payload).rstrip(b"=").decode()
@@ -59,7 +59,7 @@ def decode_token(token):
         claims = json.loads(base64.urlsafe_b64decode(parts[1] + "=" * (-len(parts[1]) % 4)))
         if not isinstance(claims.get("exp"), int) or claims["exp"] <= int(time.time()):
             return None
-        if not isinstance(claims.get("sub"), int) or claims.get("role") not in VALID_ROLES:
+        if not isinstance(claims.get("sub"), int) or not isinstance(claims.get("ver"), int) or claims.get("role") not in VALID_ROLES:
             return None
         return claims
     except (ValueError, TypeError, KeyError, RuntimeError, json.JSONDecodeError):
@@ -107,8 +107,8 @@ def create_app(test_config=None):
             if not header.startswith("Bearer "): return jsonify(error="authentication_required"), 401
             claims = decode_token(header[7:].strip())
             if claims is None: return jsonify(error="invalid_or_expired_token"), 401
-            user = db().execute("SELECT id,username,role FROM users WHERE id=?", (claims["sub"],)).fetchone()
-            if user is None or user["username"] != claims["username"] or user["role"] != claims["role"]:
+            user = db().execute("SELECT id,username,role,token_version FROM users WHERE id=?", (claims["sub"],)).fetchone()
+            if user is None or user["username"] != claims["username"] or user["role"] != claims["role"] or user["token_version"] != claims["ver"]:
                 return jsonify(error="invalid_or_expired_token"), 401
             g.user = user
             return handler(*args, **kwargs)
@@ -189,7 +189,7 @@ def create_app(test_config=None):
             response.headers["Retry-After"] = str(retry_after)
             return response
 
-        user = db().execute("SELECT id,username,password_hash,role FROM users WHERE username=?", (username,)).fetchone()
+        user = db().execute("SELECT id,username,password_hash,role,token_version FROM users WHERE username=?", (username,)).fetchone()
         if user is None or not check_password_hash(user["password_hash"], password):
             if not throttle or now - throttle["window_started"] >= 900:
                 failures, window_started = 1, now
@@ -213,6 +213,26 @@ def create_app(test_config=None):
     @app.get("/api/v1/auth/me")
     @authenticated
     def me(): return jsonify(id=g.user["id"], username=g.user["username"], role=g.user["role"])
+
+    @app.post("/api/v1/auth/password")
+    @authenticated
+    def change_password():
+        payload = payload_object()
+        if payload is None:
+            return jsonify(error="invalid_json"), 400
+        current_password, new_password = payload.get("current_password"), payload.get("new_password")
+        if not isinstance(current_password, str) or not isinstance(new_password, str):
+            return jsonify(error="invalid_password_fields"), 400
+        if not 14 <= len(new_password) <= 256:
+            return jsonify(error="weak_password"), 400
+        user = db().execute("SELECT id,password_hash FROM users WHERE id=?", (g.user["id"],)).fetchone()
+        if user is None or not check_password_hash(user["password_hash"], current_password):
+            return jsonify(error="invalid_credentials"), 401
+        db().execute("UPDATE users SET password_hash=?,token_version=token_version+1 WHERE id=?",
+                     (generate_password_hash(new_password), g.user["id"]))
+        audit(db(), g.user["id"], "auth.password_changed", "user", str(g.user["id"]))
+        db().commit()
+        return jsonify(message="Password changed. Sign in again; existing sessions have been invalidated."), 200
 
     @app.get("/api/v1/events")
     @authenticated
