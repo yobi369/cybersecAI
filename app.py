@@ -134,6 +134,10 @@ def create_app(test_config=None):
 
     @app.post("/api/v1/auth/bootstrap")
     def bootstrap():
+        bootstrap_secret = os.environ.get("CYBERSECAI_BOOTSTRAP_TOKEN", "")
+        supplied_secret = request.headers.get("X-Bootstrap-Token", "")
+        if len(bootstrap_secret) < 32 or not hmac.compare_digest(bootstrap_secret, supplied_secret):
+            return jsonify(error="bootstrap_not_authorized"), 403
         payload = payload_object()
         if payload is None: return jsonify(error="invalid_json"), 400
         username = text_field(payload, "username", 64)
