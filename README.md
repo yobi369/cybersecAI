@@ -12,7 +12,7 @@ CyberSecAI combines a browser-based SOC dashboard prototype with a Python API fo
 - Administrator-only audit endpoint.
 - Request-size limits, input validation, parameterized SQL, baseline browser security headers and non-root container.
 - SQLite for local development and PostgreSQL support through `DATABASE_URL` for durable hosted storage.
-- Automated API, HTML integrity, database-adapter and PostgreSQL integration tests in CI.
+- Automated API, HTML integrity, database-adapter and PostgreSQL integration tests in CI, plus Bandit static analysis and pip-audit dependency checks.
 - Local development and a free-tier Render blueprint for evaluation.
 
 ## Run locally
