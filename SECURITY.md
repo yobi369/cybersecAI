@@ -12,7 +12,7 @@ Use GitHub private vulnerability reporting if enabled, or contact the maintainer
 - HMAC-signed expiring bearer tokens; secret supplied by environment configuration. Token-version checks invalidate all sessions after password changes and administrator role/disable changes.
 - Role checks for event modification and administrator-only audit access. Admin-only account listing and role/disable updates; responses omit password hashes, self-lockout and last-active-admin removal are blocked, and account access changes are audited.
 - SQL parameterization, input bounds, JSON validation, pagination and request-size limits.
-- Baseline browser security headers and no-store cache policy on authentication routes.
+- Strict Content Security Policy without inline scripts or styles (`object-src 'none'`, `frame-ancestors 'none'`) and no-store cache policy on authentication routes.
 - Database-backed login throttling: five failed attempts per username/IP bucket trigger a 15-minute lockout. Edge-level abuse controls are still required.
 - PostgreSQL adapter selected through `DATABASE_URL`; SQLite remains the local-development default. CI includes Bandit static analysis, pip-audit dependency vulnerability checks, and a Docker build/runtime health smoke test that verifies the process runs as non-root; passing checks do not replace full SAST/DAST or independent review.
 - Audit records for bootstrap, successful login, event creation and status changes.
