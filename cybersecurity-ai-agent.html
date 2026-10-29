@@ -22,6 +22,22 @@
             display: flex;
             min-height: 100vh;
         }
+
+        .prototype-notice {
+            margin: 0 0 20px;
+            padding: 14px 16px;
+            border: 1px solid rgba(255, 165, 2, 0.55);
+            border-left: 4px solid #ffa502;
+            border-radius: 10px;
+            background: rgba(255, 165, 2, 0.08);
+            color: #ffe2a3;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .prototype-notice strong {
+            color: #ffa502;
+        }
         
         .sidebar {
             width: 280px;
@@ -449,6 +465,11 @@
         </nav>
         
         <main class="main-content">
+            <aside class="prototype-notice" role="note" aria-label="Prototype status">
+                <strong>Prototype / demonstration only.</strong>
+                Dashboard metrics, alerts, timestamps, and terminal output are illustrative and simulated.
+                This page is not connected to live security systems and must not be used to make operational security decisions.
+            </aside>
             <!-- Dashboard Section -->
             <div id="dashboard" class="content-section">
                 <div class="header">
