@@ -339,7 +339,7 @@ def create_app(test_config=None):
             (severity, severity, status, status, limit, offset),
         ).fetchall()
         total = db().execute(
-            "SELECT COUNT(*) total FROM events WHERE (? IS NULL OR severity=?) AND (? IS NULL OR status=?)",
+            "SELECT COUNT(*) total FROM events WHERE (CAST(? AS TEXT) IS NULL OR severity=?) AND (CAST(? AS TEXT) IS NULL OR status=?)",
             (severity, severity, status, status),
         ).fetchone()["total"]
         return jsonify(items=[dict(row) for row in rows], total=total, limit=limit, offset=offset)
