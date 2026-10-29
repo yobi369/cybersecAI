@@ -66,6 +66,20 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/v1/events?severity=medium", headers=headers).json["total"], 1)
         self.assertEqual(self.client.patch(f"/api/v1/events/{event_id}", headers=headers, json={"status":"investigating"}).status_code, 200)
         self.assertGreaterEqual(len(self.client.get("/api/v1/audit", headers=headers).json["items"]), 3)
+    def test_enum_validation_rejects_non_string_json_values(self):
+        self.assertEqual(self.bootstrap().status_code, 201)
+        headers = self.headers(self.login().json["access_token"])
+        bad_event = self.client.post("/api/v1/events", headers=headers, json={
+            "title": "test", "description": "test", "source": "test", "severity": ["critical"]
+        })
+        self.assertEqual(bad_event.status_code, 400)
+        bad_role = self.client.post("/api/v1/admin/users", headers=headers, json={
+            "username": "malformed_role", "password": "strong-password-for-user-123", "role": ["admin"]
+        })
+        self.assertEqual(bad_role.status_code, 400)
+        bad_update = self.client.patch("/api/v1/admin/users/1", headers=headers, json={"role": ["viewer"]})
+        self.assertEqual(bad_update.status_code, 400)
+
     def test_validation_rejects_bad_severity_and_extra_update_fields(self):
         self.bootstrap()
         headers = self.headers(self.login().json["access_token"])
