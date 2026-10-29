@@ -6,7 +6,7 @@ class ApiTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.env = patch.dict(os.environ, {"CYBERSECAI_DATABASE": str(Path(self.tmp.name)/"test.db"),
-            "CYBERSECAI_SECRET_KEY": "test-secret-key-that-is-at-least-thirty-two-bytes"})
+            "CYBERSECAI_SECRET_KEY": "test-secret-key-that-is-at-least-thirty-two-bytes", "CYBERSECAI_BOOTSTRAP_TOKEN": "test-bootstrap-token-that-is-over-32-bytes"})
         self.env.start()
         import app as api
         api.DATABASE_PATH = Path(os.environ["CYBERSECAI_DATABASE"])
@@ -16,13 +16,17 @@ class ApiTests(unittest.TestCase):
         self.env.stop()
         self.tmp.cleanup()
     def bootstrap(self):
-        return self.client.post("/api/v1/auth/bootstrap", json={"username":"security_admin","password":"strong-test-password-123"})
+        return self.client.post("/api/v1/auth/bootstrap", headers={"X-Bootstrap-Token":"test-bootstrap-token-that-is-over-32-bytes"}, json={"username":"security_admin","password":"strong-test-password-123"})
     def login(self, password="strong-test-password-123"):
         return self.client.post("/api/v1/auth/login", json={"username":"security_admin","password":password})
     def headers(self, token):
         return {"Authorization":"Bearer "+token}
     def test_health(self):
         self.assertEqual(self.client.get("/health").status_code, 200)
+    def test_bootstrap_requires_secret(self):
+        response = self.client.post("/api/v1/auth/bootstrap", json={"username":"intruder","password":"strong-test-password-123"})
+        self.assertEqual(response.status_code, 403)
+
     def test_bootstrap_is_one_time(self):
         self.assertEqual(self.bootstrap().status_code, 201)
         self.assertEqual(self.bootstrap().status_code, 409)
@@ -72,7 +76,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.client.post("/api/v1/analyze", headers=headers, json={"logs": "x" * 100001}).status_code, 413)
 
     def test_short_bootstrap_password_rejected(self):
-        response = self.client.post("/api/v1/auth/bootstrap", json={"username":"admin","password":"short"})
+        response = self.client.post("/api/v1/auth/bootstrap", headers={"X-Bootstrap-Token":"test-bootstrap-token-that-is-over-32-bytes"}, json={"username":"admin","password":"short"})
         self.assertEqual(response.status_code, 400)
 
 if __name__ == "__main__": unittest.main(verbosity=2)
