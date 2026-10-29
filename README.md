@@ -43,7 +43,8 @@ Log in at POST /api/v1/auth/login with JSON username and password. Use the retur
 | GET | /health | Public | Health check |
 | POST | /api/v1/auth/bootstrap | Public, one-time | Create initial administrator |
 | POST | /api/v1/auth/login | Public | Obtain expiring token |
-| GET | /api/v1/auth/me | Authenticated | Current account |\n| POST | /api/v1/auth/password | Authenticated | Change password and invalidate all existing sessions |
+| GET | /api/v1/auth/me | Authenticated | Current account |
+| POST | /api/v1/auth/password | Authenticated | Change password and invalidate all existing sessions |
 | GET | /api/v1/events | Authenticated | Filter/list events |
 | POST | /api/v1/events | Admin, analyst | Create event |
 | PATCH | /api/v1/events/{id} | Admin, analyst | Change event status |
