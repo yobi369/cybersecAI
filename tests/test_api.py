@@ -88,6 +88,15 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.client.post("/api/v1/analyze", headers=headers, json={"logs": ""}).status_code, 400)
         self.assertEqual(self.client.post("/api/v1/analyze", headers=headers, json={"logs": "x" * 100001}).status_code, 413)
 
+    def test_login_throttles_repeated_failures(self):
+        self.bootstrap()
+        for _ in range(5):
+            response = self.login("incorrect-password")
+            self.assertEqual(response.status_code, 401)
+        blocked = self.login()
+        self.assertEqual(blocked.status_code, 429)
+        self.assertGreaterEqual(int(blocked.headers.get("Retry-After", "0")), 1)
+
     def test_short_bootstrap_password_rejected(self):
         response = self.client.post("/api/v1/auth/bootstrap", headers={"X-Bootstrap-Token":"test-bootstrap-token-that-is-over-32-bytes"}, json={"username":"admin","password":"short"})
         self.assertEqual(response.status_code, 400)
