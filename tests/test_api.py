@@ -90,6 +90,21 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.client.post("/api/v1/analyze", headers=headers, json={"logs": ""}).status_code, 400)
         self.assertEqual(self.client.post("/api/v1/analyze", headers=headers, json={"logs": "x" * 100001}).status_code, 413)
 
+    def test_password_change_invalidates_existing_tokens(self):
+        self.assertEqual(self.bootstrap().status_code, 201)
+        token = self.login().json["access_token"]
+        response = self.client.post("/api/v1/auth/password", headers=self.headers(token), json={
+            "current_password": "strong-test-password-123",
+            "new_password": "new-strong-test-password-456",
+        })
+        self.assertEqual(response.status_code, 200, response.json)
+        self.assertEqual(self.client.get("/api/v1/auth/me", headers=self.headers(token)).status_code, 401)
+        self.assertEqual(self.login().status_code, 401)
+        new_login = self.client.post("/api/v1/auth/login", json={
+            "username": "security_admin", "password": "new-strong-test-password-456"
+        })
+        self.assertEqual(new_login.status_code, 200, new_login.json)
+
     def test_login_throttles_repeated_failures(self):
         self.bootstrap()
         for _ in range(5):
