@@ -22,6 +22,7 @@ Requires Python 3.12 or newer.
     source .venv/bin/activate
     pip install -r requirements.txt
     export CYBERSECAI_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+    export CYBERSECAI_BOOTSTRAP_TOKEN=$(openssl rand -hex 32)
     python -m unittest discover -s tests -v
     gunicorn --workers 2 --bind 127.0.0.1:8000 app:app
 
