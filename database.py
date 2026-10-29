@@ -105,6 +105,7 @@ def init_db():
     """
     if DATABASE_URL:
         pg_schema = re.sub(r"\bid INTEGER PRIMARY KEY\b", "id BIGSERIAL PRIMARY KEY", schema)
+        pg_schema = pg_schema.replace("created_by INTEGER", "created_by BIGINT").replace("actor_id INTEGER", "actor_id BIGINT")
         with connect_db() as db:
             db.executescript(pg_schema)
     else:
