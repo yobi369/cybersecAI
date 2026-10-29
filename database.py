@@ -97,7 +97,7 @@ def connect_db():
 
 def init_db():
     schema = """
-    CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','analyst','viewer')), token_version INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','analyst','viewer')), token_version INTEGER NOT NULL DEFAULT 0, disabled INTEGER NOT NULL DEFAULT 0 CHECK(disabled IN (0,1)), created_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL, source TEXT NOT NULL, severity TEXT NOT NULL CHECK(severity IN ('informational','low','medium','high','critical')), status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','investigating','resolved','false_positive')), event_time TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, created_by INTEGER NOT NULL REFERENCES users(id));
     CREATE INDEX IF NOT EXISTS idx_events_status_severity ON events(status,severity);
     CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at DESC);
@@ -110,10 +110,13 @@ def init_db():
         with connect_db() as db:
             db.executescript(pg_schema)
             db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0")
+            db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled INTEGER NOT NULL DEFAULT 0")
     else:
         with connect_db() as db:
             db.executescript(schema)
             columns = {row["name"] for row in db.execute("PRAGMA table_info(users)").fetchall()}
             if "token_version" not in columns:
                 db.execute("ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0")
+            if "disabled" not in columns:
+                db.execute("ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0")
             db.commit()
