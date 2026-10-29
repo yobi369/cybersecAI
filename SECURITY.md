@@ -14,7 +14,7 @@ Use GitHub private vulnerability reporting if enabled, or contact the maintainer
 - SQL parameterization, input bounds, JSON validation, pagination and request-size limits.
 - Baseline browser security headers and no-store cache policy on authentication routes.
 - Database-backed login throttling: five failed attempts per username/IP bucket trigger a 15-minute lockout. Edge-level abuse controls are still required.
-- PostgreSQL adapter selected through `DATABASE_URL`; SQLite remains the local-development default.
+- PostgreSQL adapter selected through `DATABASE_URL`; SQLite remains the local-development default. CI includes Bandit static analysis and pip-audit dependency vulnerability checks; passing scans do not replace SAST/DAST or independent review.
 - Audit records for bootstrap, successful login, event creation and status changes.
 - Container runs as a non-root user.
 
