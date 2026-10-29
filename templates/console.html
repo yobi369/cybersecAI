@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>CyberSecAI | Operations Console</title>
+<link rel="stylesheet" href="/static/console.css">
+</head>
+<body>
+<header><div class="brand">CYBERSECAI / DEFENSIVE SECURITY</div><h1 class="title">Security operations console</h1><p class="sub">A small analyst workflow for recording security events and reviewing transparent log-pattern indicators.</p></header>
+<main>
+<div class="notice"><strong>Evaluation build.</strong> Findings are heuristic indicators, not proof of compromise. Submit only logs you are authorized to review, after redacting secrets and personal data. Do not use this console as your only monitoring or incident-response control.</div>
+<div class="grid">
+<section class="card" id="auth-card"><h2>Analyst access</h2><p class="muted">Create the first administrator through the protected setup API. Then sign in here. Tokens are kept in page memory and are cleared when this tab reloads.</p>
+<label for="username">Username</label><input id="username" autocomplete="username" maxlength="64">
+<label for="password">Password</label><input id="password" type="password" autocomplete="current-password" maxlength="256">
+<div class="row"><button id="login">Sign in</button><button class="secondary" id="logout" type="button">Clear session</button></div><div class="status" id="auth-status" role="status" aria-live="polite"></div>
+</section>
+<section class="card"><h2>Session & service</h2><p id="session" class="muted">Not authenticated. Sign in to access analyst features.</p><div class="row"><button class="secondary" id="health">Check API health</button><button class="secondary" id="refresh">Refresh events</button></div><div class="status" id="service-status" role="status" aria-live="polite"></div></section>
+<section class="card"><h2>Analyze log text</h2><p class="muted">Rule-based triage; limited to 100,000 characters per request.</p><label for="logs">Authorized, redacted log sample</label><textarea id="logs" maxlength="100000" placeholder="Paste a small redacted log sample here…"></textarea><button id="analyze">Analyze sample</button><div id="analysis-status" class="status" role="status" aria-live="polite"></div><div id="findings"></div></section>
+<section class="card"><h2>Record a security event</h2><label for="event-title">Title</label><input id="event-title" maxlength="160" placeholder="Short incident or observation title"><label for="event-source">Source</label><input id="event-source" maxlength="200" placeholder="e.g. redacted-auth-log"><label for="severity">Severity</label><select id="severity"><option>informational</option><option>low</option><option selected>medium</option><option>high</option><option>critical</option></select><label for="description">Description</label><textarea id="description" maxlength="4000" placeholder="What was observed and what needs review?"></textarea><button id="create-event">Save event</button><div id="event-status" class="status" role="status" aria-live="polite"></div></section>
+<section class="card wide"><div class="row"><h2>Event register</h2><p class="muted">Newest first · maximum 100 per page</p></div><div id="events" class="muted">Sign in and refresh to load events.</div></section>
+</div>
+</main><footer>CyberSecAI · Defensive-use prototype · Verify findings independently</footer>
+<script src="/static/console.js" defer></script>
+</body></html>

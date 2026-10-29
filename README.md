@@ -1,62 +1,65 @@
-# CyberSecAI — Security Operations Dashboard
+# CyberSecAI — Security Operations Platform
 
-CyberSecAI is a lightweight, browser-based cybersecurity operations dashboard prototype. It presents a security-operations workflow across threat monitoring, DevOps security, incident response, vulnerability assessment, reporting, and access-control review.
+CyberSecAI combines a browser-based SOC dashboard prototype with a Python API for authenticated security-event triage. The API supports event creation, filtering, status tracking, role-aware access and audit records.
 
-> **Project status:** Front-end prototype / demonstration. The current interface uses illustrative sample content and simulated interactions. It is not connected to live telemetry, an AI model, a SIEM, a vulnerability scanner, an identity provider, or an incident-response platform. Do not treat displayed metrics, alerts, scan results, or terminal messages as real security findings.
+> **Honest status:** This is an actively developed foundation, not a production-certified SOC or SIEM. The dashboard's original metrics and terminal output remain illustrative. The API does not currently connect to live SIEM telemetry, provide AI inference, run vulnerability scans, or perform automated containment. CI success is not production certification.
 
-## What is included
-
-- A single-page HTML dashboard with responsive styling.
-- Navigation between dashboard sections.
-- Demonstration threat and security-event panels.
-- A simulated terminal interaction for exploring the UI.
-- No required build step or third-party runtime dependency.
+## Capabilities
+- Password-hashed accounts and one-time first-admin bootstrap.
+- Expiring HMAC-signed bearer tokens, role checks (admin, analyst, viewer), password changes that invalidate sessions, and admin-managed role/disable controls that revoke affected sessions.
+- Database-backed login throttling and baseline browser security headers.
+- Security-event creation, filtering, pagination and status updates.
+- Administrator-only audit endpoint.
+- Request-size limits, input validation, parameterized SQL, baseline browser security headers and non-root container.
+- SQLite for local development and PostgreSQL support through `DATABASE_URL` for durable hosted storage.
+- Automated API, HTML integrity, database-adapter and PostgreSQL integration tests in CI, plus Bandit static analysis, pip-audit dependency checks, and a Docker build/runtime health smoke test that verifies the container runs as non-root.
+- Local development and a free-tier Render blueprint for evaluation.
 
 ## Run locally
+Requires Python 3.12 or newer.
 
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/yobi369/cybersecAI.git
-   cd cybersecAI
-   ```
-2. Open `cybersecurity-ai-agent.html` in a modern browser, or serve the directory locally:
-   ```bash
-   python3 -m http.server 8000
-   ```
-3. Visit `http://localhost:8000/cybersecurity-ai-agent.html`.
+    git clone https://github.com/yobi369/cybersecAI.git
+    cd cybersecAI
+    python -m venv .venv
+    source .venv/bin/activate
+    pip install -r requirements.txt
+    export CYBERSECAI_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+    export CYBERSECAI_BOOTSTRAP_TOKEN=$(openssl rand -hex 32)
+    python -m unittest discover -s tests -v
+    gunicorn --workers 2 --bind 127.0.0.1:8000 app:app
 
-## Project structure
+Health endpoint: http://127.0.0.1:8000/health. Analyst console: http://127.0.0.1:8000/console.
 
-```text
-cybersecAI/
-├── cybersecurity-ai-agent.html  # Dashboard prototype
-├── tests/
-│   └── test_html.py             # Lightweight static checks
-├── .github/workflows/
-│   └── quality.yml              # Automated static validation
-├── SECURITY.md                  # Security reporting and safe-use guidance
-└── README.md
-```
+## Bootstrap the first administrator
+The endpoint requires the CYBERSECAI_BOOTSTRAP_TOKEN environment secret in the X-Bootstrap-Token header and closes once a user exists. Keep this secret private and rotate it after setup.
 
-## Security and responsible use
+    curl -X POST http://127.0.0.1:8000/api/v1/auth/bootstrap -H 'Content-Type: application/json' -H "X-Bootstrap-Token: $CYBERSECAI_BOOTSTRAP_TOKEN" -d '{"username":"security_admin","password":"replace-with-a-long-unique-password"}'
 
-This repository currently demonstrates a user interface, not a functioning security product. Do not enter credentials, API keys, production logs, personal data, or confidential incident details into the prototype. Any future integrations should be limited to systems you own or are explicitly authorized to assess. Scanning, containment, account changes, and other consequential actions must require clear authorization and appropriate human review.
+Log in at POST /api/v1/auth/login with JSON username and password. Use the returned token in the Authorization header as Bearer token.
 
-See [SECURITY.md](SECURITY.md) for reporting guidance and project limitations.
+## API overview
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| GET | /health | Public | Health check |
+| POST | /api/v1/auth/bootstrap | Public, one-time | Create initial administrator |
+| POST | /api/v1/auth/login | Public | Obtain expiring token |
+| GET | /api/v1/auth/me | Authenticated | Current account |
+| POST | /api/v1/auth/password | Authenticated | Change password and invalidate all existing sessions |\n| GET | /api/v1/admin/users | Admin | List account metadata without password hashes |\n| POST | /api/v1/admin/users | Admin | Create an account with a strong initial password |\n| PATCH | /api/v1/admin/users/{id} | Admin | Change role or disable/enable an account; revoke its sessions |
+| GET | /api/v1/events | Authenticated | Filter/list events |
+| POST | /api/v1/events | Admin, analyst | Create event |
+| PATCH | /api/v1/events/{id} | Admin, analyst | Change event status |
+| POST | /api/v1/analyze | Admin, analyst | Run transparent heuristic checks on supplied log text |
+| GET | /api/v1/audit | Admin | Read audit records |
 
-## Roadmap
+Severity values: informational, low, medium, high, critical. Status values: open, investigating, resolved, false_positive. The log-analysis endpoint uses transparent heuristic patterns, caps input size, and returns evidence with guidance. It is not an AI model, does not prove compromise, and may produce false positives or miss threats.
 
-- [ ] Replace simulated figures with clearly sourced, timestamped data.
-- [ ] Define a documented backend API and validated event schema.
-- [ ] Add authenticated access and role-based authorization before handling real data.
-- [ ] Add auditable incident workflows with human approval for consequential actions.
-- [ ] Add unit, integration, accessibility, and security tests.
-- [ ] Add deployment configuration and verify a live environment before claiming production readiness.
+## Deployment
+A Render blueprint and Dockerfile are provided for evaluation. The API now supports PostgreSQL when `DATABASE_URL` is configured; otherwise it uses SQLite for local development. **Do not use SQLite for production or multi-instance hosting.** Configure `DATABASE_URL` using a durable PostgreSQL service you control, ensure the provider requires TLS, and test backup/restore before accepting operational data. This repository change does not create a database or deploy the service. Free web services may sleep, and free database offerings/retention vary by provider; confirm current limits before relying on them. The current blueprint intentionally does not provision paid resources.
 
-## Contributing
-
-Issues and pull requests are welcome. Please describe the problem, expected behavior, and how you tested the change. Never submit secrets, private logs, or unauthorized target information.
+Account administration prevents self-lockout and removal of the last active administrator. Admin-created accounts require the administrator to deliver the initial password through a separate secure channel; automated invitations and password recovery are not yet provided. Password recovery, MFA, and tenant isolation also remain outstanding. Read SECURITY.md before deploying. Do not ingest unredacted logs or secrets. Independent security and operational reviews remain required before production use.
 
 ## License
+No license is currently specified. Reuse and redistribution permissions are not granted unless a license is added.
 
-No license is currently specified. Unless a license is added, permission to reuse, modify, or redistribute this code should not be assumed.
+
+Before deployment, review [SECURITY.md](SECURITY.md) and the [production readiness runbook](docs/PRODUCTION_READINESS.md).

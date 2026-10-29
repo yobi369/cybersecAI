@@ -1,26 +1,93 @@
 name: Quality checks
-
 on:
   push:
-    branches: [main]
+    branches: [main, "feature/**"]
   pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
-  html-integrity:
-    name: HTML integrity checks
+  test:
+    name: Unit and integrity tests
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - run: python -m compileall -q app.py tests
 
-      - name: Run static dashboard checks
-        run: python -m unittest discover -s tests -v
+  postgres-integration:
+    name: PostgreSQL integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: cybersecai_test
+          POSTGRES_USER: cybersecai
+          POSTGRES_PASSWORD: cybersecai-test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cybersecai -d cybersecai_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://cybersecai:cybersecai-test-password@localhost:5432/cybersecai_test
+      CYBERSECAI_SECRET_KEY: test-only-secret-key-with-at-least-32-bytes
+      CYBERSECAI_BOOTSTRAP_TOKEN: test-only-bootstrap-token-with-at-least-32-bytes
+      TOKEN_TTL_SECONDS: "3600"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -p 'test_postgres_integration.py' -v
+
+  security-scan:
+    name: Dependency and Python security scans
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt bandit pip-audit
+      - run: bandit -q -r app.py database.py -ll
+      - run: pip-audit
+
+  container-smoke:
+    name: Container build and runtime smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build container image
+        run: docker build --tag cybersecai-ci .
+      - name: Start container and verify health
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name cybersecai-smoke \
+            --env CYBERSECAI_SECRET_KEY=ci-only-secret-key-that-is-long-enough-123456 \
+            --env CYBERSECAI_BOOTSTRAP_TOKEN=ci-only-bootstrap-token-that-is-long-enough-123456 \
+            --publish 127.0.0.1:8000:8000 cybersecai-ci
+          cleanup() { docker logs cybersecai-smoke || true; docker rm --force cybersecai-smoke >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          healthy=false
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/health; then healthy=true; break; fi
+            sleep 1
+          done
+          test "$healthy" = true
+          test "$(docker exec cybersecai-smoke id -u)" = "10001"
