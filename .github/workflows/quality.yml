@@ -20,3 +20,35 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -m unittest discover -s tests -v
       - run: python -m compileall -q app.py tests
+
+  postgres-integration:
+    name: PostgreSQL integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: cybersecai_test
+          POSTGRES_USER: cybersecai
+          POSTGRES_PASSWORD: cybersecai-test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cybersecai -d cybersecai_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://cybersecai:cybersecai-test-password@localhost:5432/cybersecai_test
+      CYBERSECAI_SECRET_KEY: test-only-secret-key-with-at-least-32-bytes
+      CYBERSECAI_BOOTSTRAP_TOKEN: test-only-bootstrap-token-with-at-least-32-bytes
+      TOKEN_TTL_SECONDS: "3600"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -p 'test_postgres_integration.py' -v
