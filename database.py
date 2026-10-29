@@ -101,7 +101,8 @@ def init_db():
     CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL, source TEXT NOT NULL, severity TEXT NOT NULL CHECK(severity IN ('informational','low','medium','high','critical')), status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','investigating','resolved','false_positive')), event_time TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, created_by INTEGER NOT NULL REFERENCES users(id));
     CREATE INDEX IF NOT EXISTS idx_events_status_severity ON events(status,severity);
     CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at DESC);
-    CREATE TABLE IF NOT EXISTS audit_log(id INTEGER PRIMARY KEY, actor_id INTEGER REFERENCES users(id), action TEXT NOT NULL, resource_type TEXT NOT NULL, resource_id TEXT, details_json TEXT NOT NULL, created_at TEXT NOT NULL);\n    CREATE TABLE IF NOT EXISTS auth_throttle(bucket_key TEXT PRIMARY KEY, failures INTEGER NOT NULL, window_started REAL NOT NULL, blocked_until REAL NOT NULL DEFAULT 0);
+    CREATE TABLE IF NOT EXISTS audit_log(id INTEGER PRIMARY KEY, actor_id INTEGER REFERENCES users(id), action TEXT NOT NULL, resource_type TEXT NOT NULL, resource_id TEXT, details_json TEXT NOT NULL, created_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS auth_throttle(bucket_key TEXT PRIMARY KEY, failures INTEGER NOT NULL, window_started REAL NOT NULL, blocked_until REAL NOT NULL DEFAULT 0);
     """
     if DATABASE_URL:
         pg_schema = re.sub(r"\bid INTEGER PRIMARY KEY\b", "id BIGSERIAL PRIMARY KEY", schema)
