@@ -1,26 +1,29 @@
 # Security Policy
 
-## Current status
+## Current posture
+CyberSecAI is an evolving security-operations project. The browser dashboard is a demonstration; the API provides authenticated security-event triage and audit records. It is not a complete SIEM, autonomous response system, or substitute for independent security assessment.
 
-CyberSecAI is a front-end demonstration. It does not currently provide a production security monitoring service, real AI inference, authenticated access, persistent incident storage, or live scanning. Displayed alerts and metrics are illustrative and must not be relied on for operational decisions.
+## Reporting
+Use GitHub private vulnerability reporting if enabled, or contact the maintainer privately. Do not publish secrets, personal information, exploit chains, or third-party logs in public issues.
 
-## Reporting a vulnerability
+## Implemented controls
+- Password hashing with Werkzeug.
+- One-time first-administrator bootstrap, closed after an account exists.
+- HMAC-signed expiring bearer tokens; secret supplied by environment configuration.
+- Role checks for event modification and administrator-only audit access.
+- SQL parameterization, input bounds, JSON validation, pagination and request-size limits.
+- Audit records for bootstrap, successful login, event creation and status changes.
+- Container runs as a non-root user.
 
-Please use GitHub's private vulnerability reporting feature for this repository if it is enabled. Otherwise, contact the repository maintainer privately through an available GitHub contact channel. Avoid publishing exploit details, credentials, personal data, or sensitive logs in a public issue.
+## Required before production use
+- Use a managed durable database with tested backups and restore. SQLite is the local default and is not recommended for shared multi-instance production.
+- Configure TLS, network restrictions, secrets management, and edge-level rate limiting.
+- Add login throttling and abuse monitoring; per-process throttling is not sufficient across workers.
+- Add password reset, account administration, token revocation, MFA and tenant isolation before serving multiple organizations.
+- Add log retention/deletion policies and protect audit logs against tampering.
+- Add dependency, container, SAST, DAST, accessibility and penetration testing.
+- Verify deployment, database durability, backup restoration and incident procedures in the target environment.
+- Obtain independent security and operational reviews.
 
-Include:
-- A concise description of the suspected issue.
-- The affected file or component and steps to reproduce.
-- The impact you believe is possible.
-- A safe proof of concept that does not access data belonging to others.
-
-## Safe-use boundaries
-
-- Test only systems you own or have explicit authorization to assess.
-- Do not place real secrets, credentials, personal data, or confidential security events in the demo.
-- Do not interpret simulated terminal output or dashboard values as evidence of a real scan or detection.
-- Any future automated containment, account modification, or scanning capability must include authorization checks, least privilege, audit trails, and human approval appropriate to the risk.
-
-## Supported versions
-
-There are no production releases or supported production deployments at this time.
+## Safe use
+Only analyze logs from systems you own or are authorized to assess. Do not submit credentials, API keys, unredacted personal data or confidential incident records to public demos. The project does not execute containment actions or scan third-party systems.
