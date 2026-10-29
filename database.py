@@ -41,9 +41,9 @@ class ConnectionAdapter:
 
     def execute(self, sql, params=()):
         statement = sql.replace("?", "%s")
-        statement = re.sub(r"^\\s*BEGIN IMMEDIATE\\s*$", "BEGIN", statement, flags=re.I)
-        wants_id = bool(re.match(r"\\s*INSERT\\s+INTO\\s+(users|events|audit_log)\\b", statement, re.I))
-        if wants_id and not re.search(r"\\bRETURNING\\b", statement, re.I):
+        statement = re.sub(r"^\s*BEGIN IMMEDIATE\s*$", "BEGIN", statement, flags=re.I)
+        wants_id = bool(re.match(r"\s*INSERT\s+INTO\s+(users|events|audit_log)\b", statement, re.I))
+        if wants_id and not re.search(r"\bRETURNING\b", statement, re.I):
             statement = statement.rstrip().rstrip(";") + " RETURNING id"
         cursor = self._connection.execute(statement, params)
         result = CursorAdapter(cursor)
@@ -104,7 +104,7 @@ def init_db():
     CREATE TABLE IF NOT EXISTS audit_log(id INTEGER PRIMARY KEY, actor_id INTEGER REFERENCES users(id), action TEXT NOT NULL, resource_type TEXT NOT NULL, resource_id TEXT, details_json TEXT NOT NULL, created_at TEXT NOT NULL);
     """
     if DATABASE_URL:
-        pg_schema = re.sub(r"\\bid INTEGER PRIMARY KEY\\b", "id BIGSERIAL PRIMARY KEY", schema)
+        pg_schema = re.sub(r"\bid INTEGER PRIMARY KEY\b", "id BIGSERIAL PRIMARY KEY", schema)
         with connect_db() as db:
             db.executescript(pg_schema)
     else:
