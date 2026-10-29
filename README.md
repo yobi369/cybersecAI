@@ -44,7 +44,7 @@ Log in at POST /api/v1/auth/login with JSON username and password. Use the retur
 | POST | /api/v1/auth/bootstrap | Public, one-time | Create initial administrator |
 | POST | /api/v1/auth/login | Public | Obtain expiring token |
 | GET | /api/v1/auth/me | Authenticated | Current account |
-| POST | /api/v1/auth/password | Authenticated | Change password and invalidate all existing sessions |\n| GET | /api/v1/admin/users | Admin | List account metadata without password hashes |\n| PATCH | /api/v1/admin/users/{id} | Admin | Change role or disable/enable an account; revoke its sessions |
+| POST | /api/v1/auth/password | Authenticated | Change password and invalidate all existing sessions |\n| GET | /api/v1/admin/users | Admin | List account metadata without password hashes |\n| POST | /api/v1/admin/users | Admin | Create an account with a strong initial password |\n| PATCH | /api/v1/admin/users/{id} | Admin | Change role or disable/enable an account; revoke its sessions |
 | GET | /api/v1/events | Authenticated | Filter/list events |
 | POST | /api/v1/events | Admin, analyst | Create event |
 | PATCH | /api/v1/events/{id} | Admin, analyst | Change event status |
@@ -56,7 +56,7 @@ Severity values: informational, low, medium, high, critical. Status values: open
 ## Deployment
 A Render blueprint and Dockerfile are provided for evaluation. The API now supports PostgreSQL when `DATABASE_URL` is configured; otherwise it uses SQLite for local development. **Do not use SQLite for production or multi-instance hosting.** Configure `DATABASE_URL` using a durable PostgreSQL service you control, ensure the provider requires TLS, and test backup/restore before accepting operational data. This repository change does not create a database or deploy the service. Free web services may sleep, and free database offerings/retention vary by provider; confirm current limits before relying on them. The current blueprint intentionally does not provision paid resources.
 
-Account administration prevents self-lockout and removal of the last active administrator. It does not yet provide a supported account-creation/invitation flow, password recovery, MFA, or tenant isolation. Read SECURITY.md before deploying. Do not ingest unredacted logs or secrets. Independent security and operational reviews remain required before production use.
+Account administration prevents self-lockout and removal of the last active administrator. Admin-created accounts require the administrator to deliver the initial password through a separate secure channel; automated invitations and password recovery are not yet provided. Password recovery, MFA, and tenant isolation also remain outstanding. Read SECURITY.md before deploying. Do not ingest unredacted logs or secrets. Independent security and operational reviews remain required before production use.
 
 ## License
 No license is currently specified. Reuse and redistribution permissions are not granted unless a license is added.
