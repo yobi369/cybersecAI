@@ -175,8 +175,36 @@ def create_app(test_config=None):
         if payload is None: return jsonify(error="invalid_json"), 400
         username, password = text_field(payload, "username", 64), payload.get("password")
         if not username or not isinstance(password, str) or len(password) > 256: return jsonify(error="invalid_credentials"), 401
+        client_ip = request.remote_addr or "unknown"
+        throttle_key = hashlib.sha256((username.casefold() + "|" + client_ip).encode()).hexdigest()
+        now = time.time()
+        throttle = db().execute(
+            "SELECT failures,window_started,blocked_until FROM auth_throttle WHERE bucket_key=?",
+            (throttle_key,),
+        ).fetchone()
+        if throttle and throttle["blocked_until"] > now:
+            retry_after = max(1, int(throttle["blocked_until"] - now))
+            response = jsonify(error="too_many_attempts", retry_after_seconds=retry_after)
+            response.status_code = 429
+            response.headers["Retry-After"] = str(retry_after)
+            return response
+
         user = db().execute("SELECT id,username,password_hash,role FROM users WHERE username=?", (username,)).fetchone()
-        if user is None or not check_password_hash(user["password_hash"], password): return jsonify(error="invalid_credentials"), 401
+        if user is None or not check_password_hash(user["password_hash"], password):
+            if not throttle or now - throttle["window_started"] >= 900:
+                failures, window_started = 1, now
+            else:
+                failures, window_started = throttle["failures"] + 1, throttle["window_started"]
+            blocked_until = now + 900 if failures >= 5 else 0
+            db().execute(
+                "INSERT INTO auth_throttle(bucket_key,failures,window_started,blocked_until) VALUES(?,?,?,?) "
+                "ON CONFLICT(bucket_key) DO UPDATE SET failures=excluded.failures, "
+                "window_started=excluded.window_started, blocked_until=excluded.blocked_until",
+                (throttle_key, failures, window_started, blocked_until),
+            )
+            db().commit()
+            return jsonify(error="invalid_credentials"), 401
+        db().execute("DELETE FROM auth_throttle WHERE bucket_key=?", (throttle_key,))
         audit(db(), user["id"], "auth.login", "user", str(user["id"]))
         db().commit()
         return jsonify(access_token=issue_token(user), token_type="Bearer", expires_in=TOKEN_TTL_SECONDS,
