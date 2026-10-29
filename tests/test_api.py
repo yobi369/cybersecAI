@@ -8,8 +8,10 @@ class ApiTests(unittest.TestCase):
         self.env = patch.dict(os.environ, {"CYBERSECAI_DATABASE": str(Path(self.tmp.name)/"test.db"),
             "CYBERSECAI_SECRET_KEY": "test-secret-key-that-is-at-least-thirty-two-bytes", "CYBERSECAI_BOOTSTRAP_TOKEN": "test-bootstrap-token-that-is-over-32-bytes"})
         self.env.start()
+        import database
         import app as api
-        api.DATABASE_PATH = Path(os.environ["CYBERSECAI_DATABASE"])
+        database.DATABASE_PATH = Path(os.environ["CYBERSECAI_DATABASE"])
+        api.DATABASE_PATH = database.DATABASE_PATH
         api.init_db()
         self.client = api.create_app({"TESTING": True}).test_client()
     def tearDown(self):
