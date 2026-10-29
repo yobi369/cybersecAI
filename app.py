@@ -254,7 +254,7 @@ def create_app(test_config=None):
             return jsonify(error="invalid_username"), 400
         if not isinstance(password, str) or not 14 <= len(password) <= 256:
             return jsonify(error="weak_password"), 400
-        if role not in VALID_ROLES:
+        if not isinstance(role, str) or role not in VALID_ROLES:
             return jsonify(error="invalid_role"), 400
         connection = db()
         try:
@@ -280,7 +280,7 @@ def create_app(test_config=None):
         payload = payload_object()
         if payload is None or not payload or not set(payload).issubset({"role", "disabled"}):
             return jsonify(error="invalid_update"), 400
-        if "role" in payload and payload["role"] not in VALID_ROLES:
+        if "role" in payload and (not isinstance(payload["role"], str) or payload["role"] not in VALID_ROLES):
             return jsonify(error="invalid_role"), 400
         if "disabled" in payload and not isinstance(payload["disabled"], bool):
             return jsonify(error="invalid_disabled_value"), 400
@@ -348,7 +348,7 @@ def create_app(test_config=None):
         title, description, source = text_field(payload, "title", 160), text_field(payload, "description", 4000), text_field(payload, "source", 200)
         severity, event_time = payload.get("severity"), payload.get("event_time", utc_now())
         if not title or not description or not source: return jsonify(error="invalid_event_fields"), 400
-        if severity not in VALID_SEVERITIES: return jsonify(error="invalid_severity"), 400
+        if not isinstance(severity, str) or severity not in VALID_SEVERITIES: return jsonify(error="invalid_severity"), 400
         if not isinstance(event_time, str) or len(event_time) > 64: return jsonify(error="invalid_event_time"), 400
         try: event_time = datetime.fromisoformat(event_time.replace("Z", "+00:00")).isoformat()
         except ValueError: return jsonify(error="invalid_event_time"), 400
@@ -367,7 +367,7 @@ def create_app(test_config=None):
         payload = payload_object()
         if payload is None or set(payload) != {"status"}: return jsonify(error="invalid_update"), 400
         status = payload.get("status")
-        if status not in VALID_STATUSES: return jsonify(error="invalid_status"), 400
+        if not isinstance(status, str) or status not in VALID_STATUSES: return jsonify(error="invalid_status"), 400
         connection = db()
         row = connection.execute("SELECT id,status FROM events WHERE id=?", (event_id,)).fetchone()
         if row is None: return jsonify(error="not_found"), 404
