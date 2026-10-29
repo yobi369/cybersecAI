@@ -1,62 +1,57 @@
-# CyberSecAI — Security Operations Dashboard
+# CyberSecAI — Security Operations Platform
 
-CyberSecAI is a lightweight, browser-based cybersecurity operations dashboard prototype. It presents a security-operations workflow across threat monitoring, DevOps security, incident response, vulnerability assessment, reporting, and access-control review.
+CyberSecAI combines a browser-based SOC dashboard prototype with a Python API for authenticated security-event triage. The API supports event creation, filtering, status tracking, role-aware access and audit records.
 
-> **Project status:** Front-end prototype / demonstration. The current interface uses illustrative sample content and simulated interactions. It is not connected to live telemetry, an AI model, a SIEM, a vulnerability scanner, an identity provider, or an incident-response platform. Do not treat displayed metrics, alerts, scan results, or terminal messages as real security findings.
+> **Honest status:** This is an actively developed foundation, not a production-certified SOC or SIEM. The dashboard's original metrics and terminal output remain illustrative. The API does not currently connect to live SIEM telemetry, provide AI inference, run vulnerability scans, or perform automated containment. CI success is not production certification.
 
-## What is included
-
-- A single-page HTML dashboard with responsive styling.
-- Navigation between dashboard sections.
-- Demonstration threat and security-event panels.
-- A simulated terminal interaction for exploring the UI.
-- No required build step or third-party runtime dependency.
+## Capabilities
+- Password-hashed accounts and one-time first-admin bootstrap.
+- Expiring HMAC-signed bearer tokens and role checks (admin, analyst, viewer).
+- Security-event creation, filtering, pagination and status updates.
+- Administrator-only audit endpoint.
+- Request-size limits, input validation, parameterized SQL and non-root container.
+- Automated API and HTML integrity tests.
+- Local development and a free-tier Render blueprint for evaluation.
 
 ## Run locally
+Requires Python 3.12 or newer.
 
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/yobi369/cybersecAI.git
-   cd cybersecAI
-   ```
-2. Open `cybersecurity-ai-agent.html` in a modern browser, or serve the directory locally:
-   ```bash
-   python3 -m http.server 8000
-   ```
-3. Visit `http://localhost:8000/cybersecurity-ai-agent.html`.
+    git clone https://github.com/yobi369/cybersecAI.git
+    cd cybersecAI
+    python -m venv .venv
+    source .venv/bin/activate
+    pip install -r requirements.txt
+    export CYBERSECAI_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+    python -m unittest discover -s tests -v
+    gunicorn --workers 2 --bind 127.0.0.1:8000 app:app
 
-## Project structure
+Health endpoint: http://127.0.0.1:8000/health.
 
-```text
-cybersecAI/
-├── cybersecurity-ai-agent.html  # Dashboard prototype
-├── tests/
-│   └── test_html.py             # Lightweight static checks
-├── .github/workflows/
-│   └── quality.yml              # Automated static validation
-├── SECURITY.md                  # Security reporting and safe-use guidance
-└── README.md
-```
+## Bootstrap the first administrator
+The endpoint is intended for initial setup only and closes once a user exists. Restrict access during setup.
 
-## Security and responsible use
+    curl -X POST http://127.0.0.1:8000/api/v1/auth/bootstrap -H 'Content-Type: application/json' -d '{"username":"security_admin","password":"replace-with-a-long-unique-password"}'
 
-This repository currently demonstrates a user interface, not a functioning security product. Do not enter credentials, API keys, production logs, personal data, or confidential incident details into the prototype. Any future integrations should be limited to systems you own or are explicitly authorized to assess. Scanning, containment, account changes, and other consequential actions must require clear authorization and appropriate human review.
+Log in at POST /api/v1/auth/login with JSON username and password. Use the returned token in the Authorization header as Bearer token.
 
-See [SECURITY.md](SECURITY.md) for reporting guidance and project limitations.
+## API overview
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| GET | /health | Public | Health check |
+| POST | /api/v1/auth/bootstrap | Public, one-time | Create initial administrator |
+| POST | /api/v1/auth/login | Public | Obtain expiring token |
+| GET | /api/v1/auth/me | Authenticated | Current account |
+| GET | /api/v1/events | Authenticated | Filter/list events |
+| POST | /api/v1/events | Admin, analyst | Create event |
+| PATCH | /api/v1/events/{id} | Admin, analyst | Change event status |
+| GET | /api/v1/audit | Admin | Read audit records |
 
-## Roadmap
+Severity values: informational, low, medium, high, critical. Status values: open, investigating, resolved, false_positive.
 
-- [ ] Replace simulated figures with clearly sourced, timestamped data.
-- [ ] Define a documented backend API and validated event schema.
-- [ ] Add authenticated access and role-based authorization before handling real data.
-- [ ] Add auditable incident workflows with human approval for consequential actions.
-- [ ] Add unit, integration, accessibility, and security tests.
-- [ ] Add deployment configuration and verify a live environment before claiming production readiness.
+## Deployment
+A Render blueprint and Dockerfile are provided. **Do not use default SQLite storage for production.** The blueprint is a low-cost evaluation starting point, not a complete production configuration. Free web services may sleep and local filesystem data may be ephemeral. Before operational use, migrate to a durable managed PostgreSQL database, configure network and TLS controls, add shared rate limiting, and test backup/restore.
 
-## Contributing
-
-Issues and pull requests are welcome. Please describe the problem, expected behavior, and how you tested the change. Never submit secrets, private logs, or unauthorized target information.
+Read SECURITY.md before deploying. Do not ingest unredacted logs or secrets. Independent security and operational reviews remain required before production use.
 
 ## License
-
-No license is currently specified. Unless a license is added, permission to reuse, modify, or redistribute this code should not be assumed.
+No license is currently specified. Reuse and redistribution permissions are not granted unless a license is added.
