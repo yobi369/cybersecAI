@@ -226,6 +226,50 @@ def create_app(test_config=None):
         connection.commit()
         return jsonify(id=event_id, status=status, updated_at=now)
 
+    @app.post("/api/v1/analyze")
+    @roles("admin", "analyst")
+    def analyze_logs():
+        """Apply transparent defensive rules to user-supplied, authorized log text."""
+        import re
+        payload = payload_object()
+        if payload is None:
+            return jsonify(error="invalid_json"), 400
+        logs = payload.get("logs")
+        if not isinstance(logs, str) or not logs.strip():
+            return jsonify(error="invalid_logs"), 400
+        if len(logs) > 100_000:
+            return jsonify(error="logs_too_large", max_characters=100000), 413
+        rules = [
+            ("AUTH-001", "high", re.compile(r"(?i)(failed password|authentication failure|invalid user|login failed)"),
+             "Authentication failure indicator", "Repeated matches can indicate password guessing; validate against normal operational activity."),
+            ("PRIV-001", "high", re.compile(r"(?i)(sudo:.*COMMAND=|privilege escalation|elevation attempt)"),
+             "Privileged command indicator", "Review the actor, command, host, and approved change records."),
+            ("SCRIPT-001", "medium", re.compile(r"(?i)(encodedcommand|frombase64string|powershell.{0,30}-enc\b)"),
+             "Encoded script indicator", "Encoded script use can be legitimate; inspect execution context and parent process."),
+            ("WEB-001", "medium", re.compile(r"(?i)(union\s+select|<script[ >]|\.\./\.\./|%2e%2e%2f)"),
+             "Potential web attack string", "Treat this as a heuristic match, not proof of exploitation."),
+            ("NET-001", "medium", re.compile(r"(?i)(port scan|too many connection attempts|connection refused.*repeated)"),
+             "Network probing indicator", "Correlate source, destination, frequency, and authorized testing windows."),
+        ]
+        findings = []
+        for line_number, line in enumerate(logs.splitlines()[:2000], start=1):
+            if len(line) > 4000:
+                line = line[:4000]
+            for rule_id, severity, pattern, title, guidance in rules:
+                if pattern.search(line):
+                    findings.append({"rule_id": rule_id, "severity": severity, "title": title,
+                                     "line": line_number, "evidence": line[:500], "guidance": guidance})
+                    if len(findings) >= 200:
+                        break
+            if len(findings) >= 200:
+                break
+        counts = {level: sum(1 for item in findings if item["severity"] == level)
+                  for level in ("high", "medium", "low", "informational")}
+        return jsonify(engine="cybersecai-rule-based-v1", mode="heuristic",
+                       disclaimer="Heuristic indicators only; not proof of compromise and not AI-generated.",
+                       lines_processed=min(len(logs.splitlines()), 2000), findings=findings,
+                       finding_count=len(findings), severity_counts=counts), 200
+
     @app.get("/api/v1/audit")
     @roles("admin")
     def list_audit():
