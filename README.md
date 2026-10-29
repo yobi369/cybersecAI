@@ -60,3 +60,6 @@ Account administration prevents self-lockout and removal of the last active admi
 
 ## License
 No license is currently specified. Reuse and redistribution permissions are not granted unless a license is added.
+
+
+Before deployment, review [SECURITY.md](SECURITY.md) and the [production readiness runbook](docs/PRODUCTION_READINESS.md).
