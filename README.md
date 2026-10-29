@@ -25,12 +25,12 @@ Requires Python 3.12 or newer.
     python -m unittest discover -s tests -v
     gunicorn --workers 2 --bind 127.0.0.1:8000 app:app
 
-Health endpoint: http://127.0.0.1:8000/health.
+Health endpoint: http://127.0.0.1:8000/health. Analyst console: http://127.0.0.1:8000/console.
 
 ## Bootstrap the first administrator
 The endpoint requires the CYBERSECAI_BOOTSTRAP_TOKEN environment secret in the X-Bootstrap-Token header and closes once a user exists. Keep this secret private and rotate it after setup.
 
-    curl -X POST http://127.0.0.1:8000/api/v1/auth/bootstrap -H 'Content-Type: application/json' -d '{"username":"security_admin","password":"replace-with-a-long-unique-password"}'
+    curl -X POST http://127.0.0.1:8000/api/v1/auth/bootstrap -H 'Content-Type: application/json' -H "X-Bootstrap-Token: $CYBERSECAI_BOOTSTRAP_TOKEN" -d '{"username":"security_admin","password":"replace-with-a-long-unique-password"}'
 
 Log in at POST /api/v1/auth/login with JSON username and password. Use the returned token in the Authorization header as Bearer token.
 
