@@ -4,12 +4,11 @@ import hashlib, hmac, json, os, sqlite3, time
 from datetime import datetime, timezone
 from functools import wraps
 from pathlib import Path
-from typing import Any
 from flask import Flask, g, jsonify, request, render_template
 from werkzeug.security import check_password_hash, generate_password_hash
+from database import connect_db, init_db, DATABASE_PATH, DATABASE_URL
 
-DATABASE_PATH = Path(os.environ.get("CYBERSECAI_DATABASE", str(Path(__file__).parent / "data" / "cybersecai.db")))
-TOKEN_TTL_SECONDS = int(os.environ.get("TOKEN_TTL_SECONDS", "3600"))
+TOKEN_TTL_SECONDS = max(60, min(int(os.environ.get("TOKEN_TTL_SECONDS", "3600")), 86400))
 MAX_BODY_BYTES = 256 * 1024
 VALID_SEVERITIES = {"informational", "low", "medium", "high", "critical"}
 VALID_STATUSES = {"open", "investigating", "resolved", "false_positive"}
@@ -17,58 +16,6 @@ VALID_ROLES = {"admin", "analyst", "viewer"}
 
 def utc_now():
     return datetime.now(timezone.utc).isoformat()
-
-def connect_db():
-    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(DATABASE_PATH, timeout=10)
-    db.row_factory = sqlite3.Row
-    db.execute("PRAGMA foreign_keys=ON")
-    db.execute("PRAGMA busy_timeout=10000")
-    return db
-
-def init_db():
-    with connect_db() as db:
-        db.executescript("""
-        CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','analyst','viewer')), created_at TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL, source TEXT NOT NULL, severity TEXT NOT NULL CHECK(severity IN ('informational','low','medium','high','critical')), status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','investigating','resolved','false_positive')), event_time TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, created_by INTEGER NOT NULL REFERENCES users(id));
-        CREATE INDEX IF NOT EXISTS idx_events_status_severity ON events(status,severity);
-        CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at DESC);
-        CREATE TABLE IF NOT EXISTS audit_log(id INTEGER PRIMARY KEY, actor_id INTEGER REFERENCES users(id), action TEXT NOT NULL, resource_type TEXT NOT NULL, resource_id TEXT, details_json TEXT NOT NULL, created_at TEXT NOT NULL);
-        """)
-        db.commit()
-
-def audit(db, actor_id, action, resource_type, resource_id=None, details=None):
-    db.execute("INSERT INTO audit_log(actor_id,action,resource_type,resource_id,details_json,created_at) VALUES(?,?,?,?,?,?)",
-               (actor_id, action, resource_type, resource_id, json.dumps(details or {}, separators=(",", ":"), sort_keys=True), utc_now()))
-
-def token_secret():
-    secret = os.environ.get("CYBERSECAI_SECRET_KEY", "")
-    if len(secret) < 32:
-        raise RuntimeError("CYBERSECAI_SECRET_KEY must be set to at least 32 characters")
-    return secret.encode()
-
-def issue_token(user):
-    import base64
-    header = base64.urlsafe_b64encode(b'{"alg":"HS256","typ":"JWT"}').rstrip(b"=").decode()
-    payload = json.dumps({"sub": user["id"], "username": user["username"], "role": user["role"], "exp": int(time.time()) + TOKEN_TTL_SECONDS}, separators=(",", ":"), sort_keys=True).encode()
-    body = base64.urlsafe_b64encode(payload).rstrip(b"=").decode()
-    signing = f"{header}.{body}".encode()
-    signature = base64.urlsafe_b64encode(hmac.new(token_secret(), signing, hashlib.sha256).digest()).rstrip(b"=").decode()
-    return f"{header}.{body}.{signature}"
-
-def decode_token(token):
-    import base64
-    try:
-        parts = token.split(".")
-        if len(parts) != 3: return None
-        expected = base64.urlsafe_b64encode(hmac.new(token_secret(), f"{parts[0]}.{parts[1]}".encode(), hashlib.sha256).digest()).rstrip(b"=").decode()
-        if not hmac.compare_digest(expected, parts[2]): return None
-        claims = json.loads(base64.urlsafe_b64decode(parts[1] + "=" * (-len(parts[1]) % 4)))
-        if not isinstance(claims.get("exp"), int) or claims["exp"] <= int(time.time()): return None
-        if not isinstance(claims.get("sub"), int) or claims.get("role") not in VALID_ROLES: return None
-        return claims
-    except (ValueError, TypeError, KeyError, RuntimeError, json.JSONDecodeError):
-        return None
 
 def create_app(test_config=None):
     app = Flask(__name__)
@@ -150,7 +97,7 @@ def create_app(test_config=None):
         if not isinstance(password, str) or not 14 <= len(password) <= 256: return jsonify(error="weak_password"), 400
         connection = db()
         try:
-            connection.execute("BEGIN IMMEDIATE")
+            connection.execute("BEGIN IMMEDIATE" if not DATABASE_URL else "BEGIN")
             if connection.execute("SELECT 1 FROM users LIMIT 1").fetchone():
                 connection.rollback()
                 return jsonify(error="bootstrap_closed"), 409
