@@ -21,6 +21,11 @@ class ApiTests(unittest.TestCase):
         return self.client.post("/api/v1/auth/login", json={"username":"security_admin","password":password})
     def headers(self, token):
         return {"Authorization":"Bearer "+token}
+    def test_console_is_served(self):
+        response = self.client.get("/console")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Security operations console", response.data)
+
     def test_health(self):
         self.assertEqual(self.client.get("/health").status_code, 200)
     def test_bootstrap_requires_secret(self):
