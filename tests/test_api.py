@@ -151,6 +151,28 @@ class ApiTests(unittest.TestCase):
             "username": "triage_analyst", "password": "other-user-strong-password-123"
         }).status_code, 401)
 
+    def test_admin_can_create_accounts_with_strong_passwords(self):
+        self.assertEqual(self.bootstrap().status_code, 201)
+        admin_headers = self.headers(self.login().json["access_token"])
+        created = self.client.post("/api/v1/admin/users", headers=admin_headers, json={
+            "username": "new_analyst", "password": "a-new-user-strong-password-123", "role": "analyst"
+        })
+        self.assertEqual(created.status_code, 201, created.json)
+        self.assertNotIn("password", created.json)
+        self.assertNotIn("password_hash", created.json)
+        login = self.client.post("/api/v1/auth/login", json={
+            "username": "new_analyst", "password": "a-new-user-strong-password-123"
+        })
+        self.assertEqual(login.status_code, 200)
+        duplicate = self.client.post("/api/v1/admin/users", headers=admin_headers, json={
+            "username": "new_analyst", "password": "a-new-user-strong-password-123", "role": "analyst"
+        })
+        self.assertEqual(duplicate.status_code, 409)
+        weak = self.client.post("/api/v1/admin/users", headers=admin_headers, json={
+            "username": "shortpw", "password": "tiny", "role": "analyst"
+        })
+        self.assertEqual(weak.status_code, 400)
+
     def test_admin_account_management_blocks_self_lockout_and_last_admin_removal(self):
         self.assertEqual(self.bootstrap().status_code, 201)
         admin_headers = self.headers(self.login().json["access_token"])
