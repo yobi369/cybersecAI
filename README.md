@@ -9,7 +9,8 @@ CyberSecAI combines a browser-based SOC dashboard prototype with a Python API fo
 - Expiring HMAC-signed bearer tokens and role checks (admin, analyst, viewer).
 - Security-event creation, filtering, pagination and status updates.
 - Administrator-only audit endpoint.
-- Request-size limits, input validation, parameterized SQL and non-root container.
+- Request-size limits, input validation, parameterized SQL, baseline browser security headers and non-root container.
+- SQLite for local development and PostgreSQL support through `DATABASE_URL` for durable hosted storage.
 - Automated API and HTML integrity tests.
 - Local development and a free-tier Render blueprint for evaluation.
 
@@ -51,7 +52,7 @@ Log in at POST /api/v1/auth/login with JSON username and password. Use the retur
 Severity values: informational, low, medium, high, critical. Status values: open, investigating, resolved, false_positive. The log-analysis endpoint uses transparent heuristic patterns, caps input size, and returns evidence with guidance. It is not an AI model, does not prove compromise, and may produce false positives or miss threats.
 
 ## Deployment
-A Render blueprint and Dockerfile are provided. **Do not use default SQLite storage for production.** The blueprint is a low-cost evaluation starting point, not a complete production configuration. Free web services may sleep and local filesystem data may be ephemeral. Before operational use, migrate to a durable managed PostgreSQL database, configure network and TLS controls, add shared rate limiting, and test backup/restore.
+A Render blueprint and Dockerfile are provided for evaluation. The API now supports PostgreSQL when `DATABASE_URL` is configured; otherwise it uses SQLite for local development. **Do not use SQLite for production or multi-instance hosting.** Configure `DATABASE_URL` using a durable PostgreSQL service you control, ensure the provider requires TLS, and test backup/restore before accepting operational data. This repository change does not create a database or deploy the service. Free web services may sleep, and free database offerings/retention vary by provider; confirm current limits before relying on them. The current blueprint intentionally does not provision paid resources.
 
 Read SECURITY.md before deploying. Do not ingest unredacted logs or secrets. Independent security and operational reviews remain required before production use.
 
