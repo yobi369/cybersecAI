@@ -7,11 +7,12 @@ CyberSecAI combines a browser-based SOC dashboard prototype with a Python API fo
 ## Capabilities
 - Password-hashed accounts and one-time first-admin bootstrap.
 - Expiring HMAC-signed bearer tokens and role checks (admin, analyst, viewer).
+- Database-backed login throttling and baseline browser security headers.
 - Security-event creation, filtering, pagination and status updates.
 - Administrator-only audit endpoint.
 - Request-size limits, input validation, parameterized SQL, baseline browser security headers and non-root container.
 - SQLite for local development and PostgreSQL support through `DATABASE_URL` for durable hosted storage.
-- Automated API and HTML integrity tests.
+- Automated API, HTML integrity, database-adapter and PostgreSQL integration tests in CI.
 - Local development and a free-tier Render blueprint for evaluation.
 
 ## Run locally
