@@ -11,5 +11,7 @@ services:
         value: 3.12.8
       - key: CYBERSECAI_SECRET_KEY
         generateValue: true
+      - key: CYBERSECAI_BOOTSTRAP_TOKEN
+        generateValue: true
       - key: TOKEN_TTL_SECONDS
         value: "3600"
