@@ -242,6 +242,38 @@ def create_app(test_config=None):
         ).fetchall()
         return jsonify(items=[{**dict(row), "disabled": bool(row["disabled"])} for row in rows])
 
+    @app.post("/api/v1/admin/users")
+    @roles("admin")
+    def admin_create_user():
+        payload = payload_object()
+        if payload is None or set(payload) != {"username", "password", "role"}:
+            return jsonify(error="invalid_user_fields"), 400
+        username = text_field(payload, "username", 64)
+        password, role = payload.get("password"), payload.get("role")
+        if not username or not username.replace("_", "").replace("-", "").isalnum():
+            return jsonify(error="invalid_username"), 400
+        if not isinstance(password, str) or not 14 <= len(password) <= 256:
+            return jsonify(error="weak_password"), 400
+        if role not in VALID_ROLES:
+            return jsonify(error="invalid_role"), 400
+        connection = db()
+        try:
+            cursor = connection.execute(
+                "INSERT INTO users(username,password_hash,role,created_at) VALUES(?,?,?,?)",
+                (username, generate_password_hash(password), role, utc_now()),
+            )
+            user_id = cursor.lastrowid
+            audit(connection, g.user["id"], "user.created", "user", str(user_id),
+                  {"username": username, "role": role})
+            connection.commit()
+            return jsonify(id=user_id, username=username, role=role, disabled=False,
+                           message="Account created. Deliver credentials through a separate secure channel."), 201
+        except Exception as error:
+            connection.rollback()
+            if isinstance(error, sqlite3.IntegrityError) or error.__class__.__name__ == "UniqueViolation":
+                return jsonify(error="username_unavailable"), 409
+            raise
+
     @app.patch("/api/v1/admin/users/<int:user_id>")
     @roles("admin")
     def admin_update_user(user_id):
