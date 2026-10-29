@@ -22,7 +22,7 @@ Use GitHub private vulnerability reporting if enabled, or contact the maintainer
 - Configure a durable PostgreSQL `DATABASE_URL` with provider-enforced TLS, least-privilege credentials, connection limits, tested backups and restore. PostgreSQL adapter code is present but has not yet been verified against a live PostgreSQL service. SQLite remains the local default and is not recommended for shared multi-instance production.
 - Configure TLS, network restrictions, secrets management, and edge-level rate limiting.
 - Add edge-level rate limiting and abuse monitoring; application login throttling does not protect every endpoint or replace perimeter controls.
-- Add a secure account creation/invitation flow, password reset, MFA and tenant isolation before serving multiple organizations. Admin role/disable controls and session revocation are implemented, but are not a substitute for these remaining controls.
+- Admins can create accounts with strong initial passwords, but must deliver credentials through a separate secure channel. Add a verified invitation/password-reset flow, MFA and tenant isolation before serving multiple organizations. Admin role/disable controls and session revocation are implemented, but are not a substitute for these remaining controls.
 - Add log retention/deletion policies and protect audit logs against tampering.
 - Add dependency, container, SAST, DAST, accessibility and penetration testing.
 - Verify deployment, database durability, backup restoration and incident procedures in the target environment.
