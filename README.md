@@ -44,9 +44,10 @@ Log in at POST /api/v1/auth/login with JSON username and password. Use the retur
 | GET | /api/v1/events | Authenticated | Filter/list events |
 | POST | /api/v1/events | Admin, analyst | Create event |
 | PATCH | /api/v1/events/{id} | Admin, analyst | Change event status |
+| POST | /api/v1/analyze | Admin, analyst | Run transparent heuristic checks on supplied log text |
 | GET | /api/v1/audit | Admin | Read audit records |
 
-Severity values: informational, low, medium, high, critical. Status values: open, investigating, resolved, false_positive.
+Severity values: informational, low, medium, high, critical. Status values: open, investigating, resolved, false_positive. The log-analysis endpoint uses transparent heuristic patterns, caps input size, and returns evidence with guidance. It is not an AI model, does not prove compromise, and may produce false positives or miss threats.
 
 ## Deployment
 A Render blueprint and Dockerfile are provided. **Do not use default SQLite storage for production.** The blueprint is a low-cost evaluation starting point, not a complete production configuration. Free web services may sleep and local filesystem data may be ephemeral. Before operational use, migrate to a durable managed PostgreSQL database, configure network and TLS controls, add shared rate limiting, and test backup/restore.
