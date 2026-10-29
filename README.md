@@ -28,7 +28,7 @@ Requires Python 3.12 or newer.
 Health endpoint: http://127.0.0.1:8000/health.
 
 ## Bootstrap the first administrator
-The endpoint is intended for initial setup only and closes once a user exists. Restrict access during setup.
+The endpoint requires the CYBERSECAI_BOOTSTRAP_TOKEN environment secret in the X-Bootstrap-Token header and closes once a user exists. Keep this secret private and rotate it after setup.
 
     curl -X POST http://127.0.0.1:8000/api/v1/auth/bootstrap -H 'Content-Type: application/json' -d '{"username":"security_admin","password":"replace-with-a-long-unique-password"}'
 
