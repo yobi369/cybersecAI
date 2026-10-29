@@ -12,11 +12,13 @@ Use GitHub private vulnerability reporting if enabled, or contact the maintainer
 - HMAC-signed expiring bearer tokens; secret supplied by environment configuration.
 - Role checks for event modification and administrator-only audit access.
 - SQL parameterization, input bounds, JSON validation, pagination and request-size limits.
+- Baseline browser security headers and no-store cache policy on authentication routes.
+- PostgreSQL adapter selected through `DATABASE_URL`; SQLite remains the local-development default.
 - Audit records for bootstrap, successful login, event creation and status changes.
 - Container runs as a non-root user.
 
 ## Required before production use
-- Use a managed durable database with tested backups and restore. SQLite is the local default and is not recommended for shared multi-instance production.
+- Configure a durable PostgreSQL `DATABASE_URL` with provider-enforced TLS, least-privilege credentials, connection limits, tested backups and restore. PostgreSQL adapter code is present but has not yet been verified against a live PostgreSQL service. SQLite remains the local default and is not recommended for shared multi-instance production.
 - Configure TLS, network restrictions, secrets management, and edge-level rate limiting.
 - Add login throttling and abuse monitoring; per-process throttling is not sufficient across workers.
 - Add password reset, account administration, token revocation, MFA and tenant isolation before serving multiple organizations.
